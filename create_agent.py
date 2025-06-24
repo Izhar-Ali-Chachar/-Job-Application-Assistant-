@@ -1,30 +1,34 @@
-def get_jobs(query: str):
-    from job_search_tool import search_remote_jobs
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain import hub
-    from langchain.agents import create_react_agent, AgentExecutor
+from job_search_tool import search_remote_jobs
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain import hub
+from langchain.agents import create_react_agent, AgentExecutor
 
+def get_jobs(text: str):
     tools = [search_remote_jobs]
+
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite-preview-06-17")
+
     prompt = hub.pull("hwchase17/react")
 
-    agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+    agent = create_react_agent(
+        llm=llm,
+        tools=tools,
+        prompt=prompt
+    )
 
-    result = agent_executor.invoke({'input': query})
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        handle_parsing_errors=True  # ✅ Add this
+    )
 
-    # Try to extract jobs list
-    jobs = result.get("output", result)
+    # ✅ Fix the input format to be a clear question
+    input_text = f"What are some remote jobs related to: {text}?"
 
-    if isinstance(jobs, list):
-        formatted = "\n🧑‍💻 Remote Jobs Found:\n\n"
-        for i, job in enumerate(jobs, 1):
-            title = job.get("title", "No title")
-            link = job.get("link", "No link")
-            formatted += f"{i}. {title}\n   🔗 {link}\n"
-        return formatted
+    result = agent_executor.invoke({"input": input_text})
 
-    elif isinstance(jobs, str):
-        return jobs.strip()  # Raw string output
-    else:
-        return f"Unexpected output format:\n{jobs}"
+    # Optional: Just return the output portion (instead of full result dict)
+    if isinstance(result, dict) and "output" in result:
+        return result["output"]
+    return str(result)
